@@ -1,34 +1,16 @@
-use std::io::{Stdout, Write};
+use std::io::Write;
 use std::ops::Deref;
-use std::path::PathBuf;
 
 use anyhow::{anyhow, Ok, Result};
-use clap::Parser as _;
 use crossterm::{cursor, QueueableCommand};
 use csv::Writer;
 use thiserror::Error;
 
-#[derive(Debug, clap::Parser)]
-pub struct Args {
-    // TODO: Implemet some error handligns:
-    // It must be a file, not a directory.
-    // And its length should be greater than 0.
-    file: Vec<PathBuf>,
-    #[clap(short, long)]
-    width: Option<usize>,
-    #[clap(short, long)]
-    height: Option<usize>,
-    /// The color palette file.
-    // TODO: Not implemented yet. YAML format?
-    #[clap(short, long)]
-    colors: Option<PathBuf>,
-    /// The character to use for brush.
-    /// Default is `█`.
-    #[clap(short, long)]
-    brush: Option<String>,
-}
+pub struct Brush(char);
 
-const DEFAULT_BRUSH: char = '█';
+impl Brush {
+    pub const DEFAULT_BRUSH: Self = Self('█');
+}
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub struct Color(pub u8);
@@ -36,7 +18,7 @@ pub struct Color(pub u8);
 impl Color {
     /// The background color index.
     // NOTE: This is not configurable.
-    pub const BG_COLOR: Self = Color(0);
+    pub const BG_COLOR: Self = Self(0);
 
     pub const MAX: u8 = u8::MAX;
 }
@@ -75,13 +57,14 @@ impl Deref for RawBuffer {
 
 #[derive(Debug, Default)]
 pub struct Buffer {
+    /// The maximum position of the current rendered buffer.
     max_position: Position,
     data: RawBuffer,
 }
 
 impl Buffer {
     /// Parsing the buffer into csv format.
-    // FIXME: Should be serialization with serde.
+    /// FIXME: Should be serialization with serde.
     pub fn to_csv(&self, colors: &Colors) -> Result<String> {
         let mut csv = Writer::from_writer(Vec::new());
 
@@ -273,7 +256,7 @@ impl Cursor {
     }
 }
 
-pub trait Renderable {
+pub trait Renderable: Write {
     fn render(&mut self, buffer: &Buffer) -> Result<()> {
         let pos = self.size()?;
         for y in 0..pos.y {
@@ -285,25 +268,15 @@ pub trait Renderable {
         }
         Ok(())
     }
-    fn size(&mut self) -> Result<Position>;
     fn scroll(&mut self) -> Result<()> {
         Ok(())
     }
+    fn size(&mut self) -> Result<Position>;
+    fn set_position(&mut self, position: Position) -> Result<()>;
 }
 
-// impl<T: Write + ?Sized> Renderable for T {}
-
-fn draw<T: Write + ?Sized>(out: &mut T) -> Result<()> {
-    out.flush()?;
-    Ok(())
-}
-
-fn main() -> Result<()> {
-    let args = Args::parse();
-
-    let mut stdout = std::io::stdout();
-
-    draw(&mut stdout)?;
-
-    Ok(())
-}
+// impl<T: Write + ?Sized> Renderable for T {
+//     fn size(&mut self) -> Result<Position> {
+//         todo!()
+//     }
+// }
