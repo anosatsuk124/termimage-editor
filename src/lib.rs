@@ -1,3 +1,8 @@
+pub mod default;
+
+#[doc(inline)]
+pub use crate::default::*;
+
 use std::io::Write;
 use std::ops::Deref;
 
@@ -6,10 +11,14 @@ use crossterm::{cursor, QueueableCommand};
 use csv::Writer;
 use thiserror::Error;
 
-pub struct Brush(char);
+pub enum Brush {
+    Char(char),
+    String(String),
+}
 
 impl Brush {
-    pub const DEFAULT_BRUSH: Self = Self('█');
+    /// Defined in [`crate::DEFAULT_BRUSH`].
+    pub const DEFAULT: Self = Self::Char(crate::DEFAULT_BRUSH);
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
@@ -64,7 +73,7 @@ pub struct Buffer {
 
 impl Buffer {
     /// Parsing the buffer into csv format.
-    /// FIXME: Should be serialization with serde.
+    // FIXME: Should be serialization with serde.
     pub fn to_csv(&self, colors: &Colors) -> Result<String> {
         let mut csv = Writer::from_writer(Vec::new());
 
@@ -72,6 +81,7 @@ impl Buffer {
             for x in 0..self.max_position.x {
                 let index = y * self.max_position.x + x;
                 let color = self.data.0[index];
+                // TODO: `Color` should be implemented `Index` trait.
                 let color_name = colors.0[u8::from(color) as usize].clone();
                 csv.write_record(&[x.to_string(), y.to_string(), color_name])?;
             }
@@ -82,7 +92,7 @@ impl Buffer {
         Ok(string)
     }
 
-    /// Return a new buffer with the new width.
+    /// Returns a new buffer with the new width.
     pub fn new_width_buffer(self, new_width: usize) -> Self {
         let mut new_data = RawBuffer::default();
 
@@ -106,7 +116,7 @@ impl Buffer {
         }
     }
 
-    /// Return a new buffer with the new height.
+    /// Returns a new buffer with the new height.
     pub fn new_height_buffer(self, new_height: usize) -> Self {
         let mut new_data = RawBuffer::default();
 
@@ -132,13 +142,13 @@ impl Buffer {
         }
     }
 
-    /// Return a new buffer with the new size.
+    /// Returns a new buffer with the new size.
     pub fn new_size_buffer(self, new_width: usize, new_height: usize) -> Self {
         self.new_width_buffer(new_width)
             .new_height_buffer(new_height)
     }
 
-    /// NOTE: This does not check the range.
+    /// **NOTE: This does not check the range.**
     pub fn get_index(&self, position: Position) -> usize {
         position.y * self.max_position.x + position.x
     }
